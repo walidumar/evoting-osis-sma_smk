@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pengaturan Pemilihan - E-Voting OSIS</title>
+<script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="min-h-screen bg-slate-950 text-white">
+  <div id="adminNav"></div>
+  <div class="max-w-2xl mx-auto p-4 md:p-8">
+    <h1 class="text-2xl font-bold mb-6">Pengaturan Pemilihan</h1>
+
+    <div id="alertBox" class="hidden mb-4 p-3 rounded-lg text-sm"></div>
+
+    <form id="settingsForm" class="bg-white/5 border border-white/10 rounded-xl p-6 space-y-4">
+      <div>
+        <label class="block text-sm font-medium mb-1">Nama Pemilihan</label>
+        <input id="nama_pemilihan" class="w-full rounded-lg bg-slate-800 border border-white/10 px-3 py-2">
+      </div>
+      <div>
+        <label class="block text-sm font-medium mb-1">Nama Sekolah</label>
+        <input id="nama_sekolah" class="w-full rounded-lg bg-slate-800 border border-white/10 px-3 py-2">
+      </div>
+      <div>
+        <label class="block text-sm font-medium mb-1">Tahun Pelajaran</label>
+        <input id="tahun_pelajaran" class="w-full rounded-lg bg-slate-800 border border-white/10 px-3 py-2" placeholder="2026/2027">
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="block text-sm font-medium mb-1">Waktu Mulai</label>
+          <input id="start_at" type="datetime-local" class="w-full rounded-lg bg-slate-800 border border-white/10 px-3 py-2">
+        </div>
+        <div>
+          <label class="block text-sm font-medium mb-1">Waktu Selesai</label>
+          <input id="end_at" type="datetime-local" class="w-full rounded-lg bg-slate-800 border border-white/10 px-3 py-2">
+        </div>
+      </div>
+      <div>
+        <label class="block text-sm font-medium mb-1">Status Pemilihan</label>
+        <select id="status" class="w-full rounded-lg bg-slate-800 border border-white/10 px-3 py-2">
+          <option value="belum_dimulai">Belum Dimulai</option>
+          <option value="berlangsung">Sedang Berlangsung</option>
+          <option value="selesai">Selesai</option>
+        </select>
+        <p class="text-xs text-slate-500 mt-1">Ubah ke "Sedang Berlangsung" untuk membuka akses login pemilih. Waktu mulai/selesai di atas hanya sebagai catatan jadwal — status inilah yang benar-benar mengontrol akses.</p>
+      </div>
+      <button class="w-full bg-blue-600 hover:bg-blue-500 rounded-lg py-2.5 font-semibold">Simpan Pengaturan</button>
+    </form>
+
+    <div class="bg-white/5 border border-white/10 rounded-xl p-6 mt-6">
+      <h2 class="font-semibold mb-3">Ganti Password Admin</h2>
+      <form id="passForm" class="space-y-3">
+        <input id="oldPassword" type="password" placeholder="Password lama" required class="w-full rounded-lg bg-slate-800 border border-white/10 px-3 py-2">
+        <input id="newPassword" type="password" placeholder="Password baru (min. 8 karakter)" required class="w-full rounded-lg bg-slate-800 border border-white/10 px-3 py-2">
+        <button class="w-full bg-slate-700 hover:bg-slate-600 rounded-lg py-2.5 font-semibold text-sm">Ubah Password</button>
+      </form>
+    </div>
+  </div>
+
+<script src="/js/api.js"></script>
+<script src="/js/admin-nav.js"></script>
+<script>
+function showAlert(msg, type='error') {
+  const box = document.getElementById('alertBox');
+  box.textContent = msg;
+  box.className = 'mb-4 p-3 rounded-lg text-sm ' + (type==='error' ? 'bg-red-500/20 text-red-200 border border-red-500/30' : 'bg-green-500/20 text-green-200 border border-green-500/30');
+  box.classList.remove('hidden');
+  setTimeout(() => box.classList.add('hidden'), 4000);
+}
+
+async function loadSettings() {
+  const r = await apiGet('/api/admin/settings');
+  if (!r.ok) return;
+  const s = r.data;
+  document.getElementById('nama_pemilihan').value = s.nama_pemilihan;
+  document.getElementById('nama_sekolah').value = s.nama_sekolah;
+  document.getElementById('tahun_pelajaran').value = s.tahun_pelajaran;
+  document.getElementById('start_at').value = s.start_at || '';
+  document.getElementById('end_at').value = s.end_at || '';
+  document.getElementById('status').value = s.status;
+}
+
+document.getElementById('settingsForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const r = await apiPut('/api/admin/settings', {
+    nama_pemilihan: document.getElementById('nama_pemilihan').value,
+    nama_sekolah: document.getElementById('nama_sekolah').value,
+    tahun_pelajaran: document.getElementById('tahun_pelajaran').value,
+    start_at: document.getElementById('start_at').value,
+    end_at: document.getElementById('end_at').value,
+    status: document.getElementById('status').value,
+  });
+  if (r.ok) showAlert('Pengaturan tersimpan.', 'success');
+  else showAlert(r.message || 'Gagal menyimpan (mungkin butuh akses superadmin).');
+});
+
+document.getElementById('passForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const r = await apiPost('/api/admin/change-password', {
+    oldPassword: document.getElementById('oldPassword').value,
+    newPassword: document.getElementById('newPassword').value,
+  });
+  if (r.ok) { showAlert('Password berhasil diubah.', 'success'); e.target.reset(); }
+  else showAlert(r.message || 'Gagal mengubah password.');
+});
+
+async function init() {
+  const me = await guardAdmin();
+  if (!me) return;
+  loadSettings();
+}
+init();
+</script>
+</body>
+</html>

@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Import Data Pemilih - E-Voting OSIS</title>
+<script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="min-h-screen bg-slate-950 text-white">
+  <div id="adminNav"></div>
+  <div class="max-w-4xl mx-auto p-4 md:p-8">
+    <h1 class="text-2xl font-bold mb-2">Import Data Pemilih</h1>
+    <p class="text-slate-400 text-sm mb-6">Unggah file CSV/XLSX untuk menambahkan data pemilih secara massal. Data akan ditampilkan sebagai pratinjau sebelum benar-benar disimpan.</p>
+
+    <div class="flex gap-3 mb-6 text-sm">
+      <a href="/templates/template_siswa.csv" download class="text-blue-400 hover:underline">⬇ Download Template Siswa</a>
+      <a href="/templates/template_guru.csv" download class="text-blue-400 hover:underline">⬇ Download Template Guru</a>
+    </div>
+
+    <div class="bg-white/5 border border-white/10 rounded-xl p-5 mb-6">
+      <div class="grid sm:grid-cols-3 gap-3 mb-4">
+        <button data-type="siswa" class="typeBtn bg-blue-600 rounded-lg py-2.5 font-semibold text-sm">IMPORT DATA SISWA</button>
+        <button data-type="guru" class="typeBtn bg-slate-700 rounded-lg py-2.5 font-semibold text-sm">IMPORT DATA GURU</button>
+        <button data-type="gabungan" class="typeBtn bg-slate-700 rounded-lg py-2.5 font-semibold text-sm">FORMAT GABUNGAN (Auto-Deteksi)</button>
+      </div>
+      <p id="typeHelp" class="text-xs text-slate-500 mb-3">Format: NISN, Nama, Kelas, Jurusan.</p>
+
+      <input id="fileInput" type="file" accept=".csv,.xlsx,.xls" class="w-full text-sm mb-4">
+
+      <label class="flex items-center gap-2 text-sm mb-4">
+        <input id="updateExisting" type="checkbox" class="rounded"> Perbarui data yang sudah ada (Update Existing)
+      </label>
+
+      <button id="btnPreview" class="bg-blue-600 hover:bg-blue-500 rounded-lg px-5 py-2.5 font-semibold text-sm">Pratinjau Data</button>
+    </div>
+
+    <div id="alertBox" class="hidden mb-4 p-3 rounded-lg text-sm"></div>
+
+    <div id="previewArea" class="hidden bg-white/5 border border-white/10 rounded-xl p-5">
+      <div id="previewSummary" class="grid sm:grid-cols-3 gap-3 mb-4"></div>
+
+      <div id="invalidSection" class="hidden mb-4">
+        <h3 class="font-semibold text-sm mb-2 text-red-300">Baris Bermasalah</h3>
+        <div class="max-h-56 overflow-y-auto border border-white/10 rounded-lg">
+          <table class="w-full text-xs">
+            <thead class="bg-slate-800 sticky top-0"><tr><th class="p-2 text-left">Baris</th><th class="p-2 text-left">Data</th><th class="p-2 text-left">Masalah</th></tr></thead>
+            <tbody id="invalidRows"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <button id="btnConfirmImport" class="bg-green-600 hover:bg-green-500 rounded-lg px-5 py-2.5 font-semibold text-sm">Konfirmasi &amp; Simpan Data Valid</button>
+    </div>
+  </div>
+
+<script src="/js/api.js"></script>
+<script src="/js/admin-nav.js"></script>
+<script>
+let currentType = 'siswa';
+let previewData = null;
+
+const helpText = {
+  siswa: 'Format: NISN, Nama, Kelas, Jurusan.',
+  guru: 'Format: NIK, Nama, NIP, Jabatan.',
+  gabungan: 'Untuk file DPT lama satu sheet: NO, NAMA, NISN/NIK, KELAS/jabatan. Sistem otomatis memisahkan siswa & guru berdasarkan panjang angka identitas dan pola kelas.',
+};
+
+document.querySelectorAll('.typeBtn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    currentType = btn.dataset.type;
+    document.querySelectorAll('.typeBtn').forEach(b => b.className = 'typeBtn bg-slate-700 rounded-lg py-2.5 font-semibold text-sm');
+    btn.className = 'typeBtn bg-blue-600 rounded-lg py-2.5 font-semibold text-sm';
+    document.getElementById('typeHelp').textContent = helpText[currentType];
+    document.getElementById('previewArea').classList.add('hidden');
+  });
+});
+
+function showAlert(msg, type='error') {
+  const box = document.getElementById('alertBox');
+  box.textContent = msg;
+  box.className = 'mb-4 p-3 rounded-lg text-sm ' + (type==='error' ? 'bg-red-500/20 text-red-200 border border-red-500/30' : 'bg-green-500/20 text-green-200 border border-green-500/30');
+  box.classList.remove('hidden');
+}
+
+function summaryCard(label, value, colorClass='text-white') {
+  return `<div class="bg-slate-800 rounded-lg p-3 text-center"><p class="text-xs text-slate-400">${label}</p><p class="text-xl font-bold ${colorClass}">${value}</p></div>`;
+}
+
+document.getElementById('btnPreview').addEventListener('click', async () => {
+  const file = document.getElementById('fileInput').files[0];
+  if (!file) return showAlert('Pilih file terlebih dahulu.');
+
+  const fd = new FormData();
+  fd.append('file', file);
+  const r = await apiPost('/api/admin/import/preview?type=' + currentType, fd, true);
+  if (!r.ok) return showAlert(r.message || 'Gagal memproses file.');
+
+  previewData = r.data;
+  document.getElementById('previewArea').classList.remove('hidden');
+  const summary = document.getElementById('previewSummary');
+  const invalidRowsBody = document.getElementById('invalidRows');
+  invalidRowsBody.innerHTML = '';
+
+  if (currentType === 'gabungan') {
+    summary.innerHTML =
+      summaryCard('Siswa Valid', previewData.siswa.validCount, 'text-green-400') +
+      summaryCard('Siswa Bermasalah', previewData.siswa.invalidCount, 'text-red-400') +
+      summaryCard('Guru Valid', previewData.guru.validCount, 'text-green-400') +
+      summaryCard('Guru Bermasalah', previewData.guru.invalidCount, 'text-red-400');
+    const allInvalid = [...previewData.siswa.invalidRows.map(x => ({...x, kind:'Siswa'})), ...previewData.guru.invalidRows.map(x => ({...x, kind:'Guru'}))];
+    renderInvalid(allInvalid);
+  } else {
+    summary.innerHTML =
+      summaryCard('Total Baris', previewData.totalRows) +
+      summaryCard('Valid', previewData.validCount, 'text-green-400') +
+      summaryCard('Bermasalah', previewData.invalidCount, 'text-red-400');
+    renderInvalid(previewData.invalidRows.map(x => ({...x, kind: currentType})));
+  }
+});
+
+function renderInvalid(rows) {
+  const section = document.getElementById('invalidSection');
+  const body = document.getElementById('invalidRows');
+  if (rows.length === 0) { section.classList.add('hidden'); return; }
+  section.classList.remove('hidden');
+  body.innerHTML = rows.slice(0, 100).map(r => `
+    <tr class="border-t border-white/5">
+      <td class="p-2">${r.rowNumber}</td>
+      <td class="p-2 text-slate-400">${JSON.stringify(r.data)}</td>
+      <td class="p-2 text-red-300">${r.errors.join('; ')}</td>
+    </tr>
+  `).join('');
+}
+
+document.getElementById('btnConfirmImport').addEventListener('click', async () => {
+  if (!previewData) return;
+  const updateExisting = document.getElementById('updateExisting').checked;
+  let payload = { type: currentType, updateExisting };
+
+  if (currentType === 'gabungan') {
+    payload.siswaRows = previewData.siswa.validRows;
+    payload.guruRows = previewData.guru.validRows;
+  } else if (currentType === 'siswa') {
+    payload.siswaRows = previewData.validRows;
+  } else {
+    payload.guruRows = previewData.validRows;
+  }
+
+  const r = await apiPost('/api/admin/import/commit', payload);
+  if (r.ok) {
+    showAlert(`Import selesai. Ditambahkan: ${r.data.inserted}, Diperbarui: ${r.data.updated}, Dilewati: ${r.data.skipped}.`, 'success');
+    document.getElementById('previewArea').classList.add('hidden');
+    document.getElementById('fileInput').value = '';
+  } else {
+    showAlert(r.message || 'Gagal menyimpan data.');
+  }
+});
+
+async function init() {
+  const me = await guardAdmin();
+  if (!me) return;
+}
+init();
+</script>
+</body>
+</html>

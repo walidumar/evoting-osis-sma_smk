@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Login Admin - E-Voting OSIS</title>
+<script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="min-h-screen bg-slate-950 text-white flex items-center justify-center p-4">
+  <div class="w-full max-w-sm">
+    <div class="bg-white/5 border border-white/10 rounded-2xl p-8">
+      <h1 class="text-xl font-bold mb-1">Panel Admin</h1>
+      <p class="text-slate-400 text-sm mb-6">E-Voting Pemilihan Ketua OSIS</p>
+      <div id="alertBox" class="hidden mb-4 p-3 rounded-lg text-sm bg-red-500/20 text-red-200 border border-red-500/30"></div>
+      <form id="loginForm" class="space-y-4">
+        <div>
+          <label class="block text-sm font-medium mb-1">Username</label>
+          <input id="username" class="w-full rounded-lg bg-slate-800 border border-white/10 px-4 py-2.5" required autocomplete="username">
+        </div>
+        <div>
+          <label class="block text-sm font-medium mb-1">Password</label>
+          <input id="password" type="password" class="w-full rounded-lg bg-slate-800 border border-white/10 px-4 py-2.5" required autocomplete="current-password">
+        </div>
+        <button id="btnSubmit" class="w-full bg-blue-600 hover:bg-blue-500 rounded-lg py-2.5 font-semibold">MASUK</button>
+      </form>
+    </div>
+    <p class="text-center mt-4"><a href="/index.html" class="text-xs text-slate-500 hover:text-slate-300">&larr; Kembali ke halaman utama</a></p>
+  </div>
+
+<script src="/js/api.js"></script>
+<script>
+document.getElementById('loginForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const btn = document.getElementById('btnSubmit');
+  btn.disabled = true; btn.textContent = 'Memproses...';
+  const r = await apiPost('/api/admin/login', {
+    username: document.getElementById('username').value.trim(),
+    password: document.getElementById('password').value,
+  });
+  if (r.ok) {
+    window.location.href = '/admin/dashboard.html';
+  } else {
+    const box = document.getElementById('alertBox');
+    box.textContent = r.message || 'Login gagal.';
+    box.classList.remove('hidden');
+    btn.disabled = false; btn.textContent = 'MASUK';
+  }
+});
+</script>
+</body>
+</html>

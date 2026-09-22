@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Login Guru - E-Voting OSIS</title>
+<script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="min-h-screen bg-gradient-to-br from-slate-900 via-emerald-950 to-slate-900 text-white flex items-center justify-center p-4">
+  <div class="w-full max-w-md">
+    <div class="bg-white/5 backdrop-blur border border-white/10 rounded-2xl shadow-2xl p-8">
+      <a href="/index.html" class="text-sm text-emerald-300 hover:underline">&larr; Kembali</a>
+      <h1 class="text-2xl font-bold mt-4 mb-1">Login Guru</h1>
+      <p class="text-slate-400 text-sm mb-6">Masukkan NIK Anda untuk melanjutkan.</p>
+
+      <div id="alertBox" class="hidden mb-4 p-3 rounded-lg text-sm"></div>
+
+      <form id="loginForm" class="space-y-4">
+        <div>
+          <label class="block text-sm font-medium mb-1">NIK</label>
+          <input id="nik" type="text" inputmode="numeric" autocomplete="off" required
+            class="w-full rounded-lg bg-slate-800 border border-white/10 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+            placeholder="Masukkan NIK/identitas terdaftar">
+        </div>
+        <button type="submit" id="btnSubmit" class="w-full bg-emerald-600 hover:bg-emerald-500 transition rounded-lg py-3 font-semibold">LANJUTKAN</button>
+      </form>
+    </div>
+  </div>
+
+<script src="/js/api.js"></script>
+<script>
+const form = document.getElementById('loginForm');
+const alertBox = document.getElementById('alertBox');
+const btn = document.getElementById('btnSubmit');
+
+function showAlert(msg) {
+  alertBox.textContent = msg;
+  alertBox.className = 'mb-4 p-3 rounded-lg text-sm bg-red-500/20 text-red-200 border border-red-500/30';
+  alertBox.classList.remove('hidden');
+}
+
+form.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  btn.disabled = true; btn.textContent = 'Memproses...';
+  const nik = document.getElementById('nik').value.trim();
+  const r = await apiPost('/api/voter/login-guru', { nik });
+  if (r.ok) {
+    sessionStorage.setItem('voterName', r.data.nama);
+    window.location.href = '/vote.html';
+  } else {
+    showAlert(r.message || 'Login gagal.');
+    btn.disabled = false; btn.textContent = 'LANJUTKAN';
+  }
+});
+</script>
+</body>
+</html>

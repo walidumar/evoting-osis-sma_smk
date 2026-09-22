@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Manajemen Paslon - E-Voting OSIS</title>
+<script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="min-h-screen bg-slate-950 text-white">
+  <div id="adminNav"></div>
+  <div class="max-w-6xl mx-auto p-4 md:p-8">
+    <div class="flex items-center justify-between mb-6">
+      <h1 class="text-2xl font-bold">Manajemen Pasangan Calon</h1>
+      <button id="btnNew" class="bg-blue-600 hover:bg-blue-500 rounded-lg px-4 py-2 text-sm font-semibold">+ Tambah Paslon</button>
+    </div>
+
+    <div id="alertBox" class="hidden mb-4 p-3 rounded-lg text-sm"></div>
+    <div id="list" class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3"></div>
+  </div>
+
+  <!-- Modal form -->
+  <div id="formModal" class="hidden fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50 overflow-y-auto">
+    <div class="bg-slate-900 border border-white/10 rounded-2xl p-6 max-w-lg w-full my-8">
+      <h2 id="formTitle" class="text-lg font-bold mb-4">Tambah Paslon</h2>
+      <form id="candidateForm" class="space-y-3">
+        <input type="hidden" id="candidateId">
+        <div>
+          <label class="block text-sm font-medium mb-1">Nomor Urut</label>
+          <input id="nomor_urut" type="number" min="1" required class="w-full rounded-lg bg-slate-800 border border-white/10 px-3 py-2">
+        </div>
+        <div>
+          <label class="block text-sm font-medium mb-1">Nama Ketua</label>
+          <input id="nama_ketua" required class="w-full rounded-lg bg-slate-800 border border-white/10 px-3 py-2">
+        </div>
+        <div>
+          <label class="block text-sm font-medium mb-1">Nama Wakil</label>
+          <input id="nama_wakil" class="w-full rounded-lg bg-slate-800 border border-white/10 px-3 py-2">
+        </div>
+        <div>
+          <label class="block text-sm font-medium mb-1">Visi</label>
+          <textarea id="visi" rows="2" class="w-full rounded-lg bg-slate-800 border border-white/10 px-3 py-2"></textarea>
+        </div>
+        <div>
+          <label class="block text-sm font-medium mb-1">Misi</label>
+          <textarea id="misi" rows="2" class="w-full rounded-lg bg-slate-800 border border-white/10 px-3 py-2"></textarea>
+        </div>
+        <div>
+          <label class="block text-sm font-medium mb-1">Foto Paslon (JPG/PNG/WEBP, maks 3MB)</label>
+          <input id="foto" type="file" accept="image/jpeg,image/png,image/webp" class="w-full text-sm">
+        </div>
+        <div>
+          <label class="block text-sm font-medium mb-1">Status</label>
+          <select id="status" class="w-full rounded-lg bg-slate-800 border border-white/10 px-3 py-2">
+            <option value="active">Aktif</option>
+            <option value="inactive">Nonaktif</option>
+          </select>
+        </div>
+        <div class="flex gap-3 pt-2">
+          <button type="button" id="btnCancel" class="flex-1 bg-slate-700 hover:bg-slate-600 rounded-lg py-2.5 font-semibold">Batal</button>
+          <button type="submit" id="btnSave" class="flex-1 bg-blue-600 hover:bg-blue-500 rounded-lg py-2.5 font-semibold">Simpan</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+<script src="/js/api.js"></script>
+<script src="/js/admin-nav.js"></script>
+<script>
+let candidates = [];
+
+function showAlert(msg, type='error') {
+  const box = document.getElementById('alertBox');
+  box.textContent = msg;
+  box.className = 'mb-4 p-3 rounded-lg text-sm ' + (type==='error' ? 'bg-red-500/20 text-red-200 border border-red-500/30' : 'bg-green-500/20 text-green-200 border border-green-500/30');
+  box.classList.remove('hidden');
+  setTimeout(() => box.classList.add('hidden'), 4000);
+}
+
+function renderList() {
+  document.getElementById('list').innerHTML = candidates.map(c => `
+    <div class="bg-white/5 border border-white/10 rounded-xl overflow-hidden">
+      <div class="aspect-video bg-slate-800 flex items-center justify-center">
+        ${c.foto ? `<img src="${c.foto}" class="w-full h-full object-cover">` : `<span class="text-slate-500 text-sm">Tidak ada foto</span>`}
+      </div>
+      <div class="p-4">
+        <div class="flex items-center justify-between mb-1">
+          <span class="text-blue-300 font-bold text-sm">PASLON ${c.nomor_urut}</span>
+          <span class="text-xs px-2 py-0.5 rounded-full ${c.status==='active' ? 'bg-green-500/20 text-green-300' : 'bg-slate-700 text-slate-400'}">${c.status==='active' ? 'Aktif' : 'Nonaktif'}</span>
+        </div>
+        <p class="font-semibold">${c.nama_ketua} &amp; ${c.nama_wakil || '-'}</p>
+        <div class="flex gap-2 mt-3">
+          <button onclick="editCandidate(${c.id})" class="flex-1 bg-slate-700 hover:bg-slate-600 rounded-lg py-1.5 text-sm">Edit</button>
+          <button onclick="deactivateCandidate(${c.id})" class="flex-1 bg-red-600/70 hover:bg-red-600 rounded-lg py-1.5 text-sm">Nonaktifkan</button>
+        </div>
+      </div>
+    </div>
+  `).join('') || '<p class="text-slate-500 col-span-full">Belum ada paslon. Klik "Tambah Paslon" untuk mulai.</p>';
+}
+
+async function loadCandidates() {
+  const r = await apiGet('/api/admin/candidates');
+  if (r.ok) { candidates = r.data; renderList(); }
+}
+
+function openForm(candidate = null) {
+  document.getElementById('formTitle').textContent = candidate ? 'Edit Paslon' : 'Tambah Paslon';
+  document.getElementById('candidateId').value = candidate ? candidate.id : '';
+  document.getElementById('nomor_urut').value = candidate ? candidate.nomor_urut : (candidates.length + 1);
+  document.getElementById('nama_ketua').value = candidate ? candidate.nama_ketua : '';
+  document.getElementById('nama_wakil').value = candidate ? candidate.nama_wakil : '';
+  document.getElementById('visi').value = candidate ? candidate.visi : '';
+  document.getElementById('misi').value = candidate ? candidate.misi : '';
+  document.getElementById('status').value = candidate ? candidate.status : 'active';
+  document.getElementById('foto').value = '';
+  document.getElementById('formModal').classList.remove('hidden');
+}
+
+function editCandidate(id) { openForm(candidates.find(c => c.id === id)); }
+
+async function deactivateCandidate(id) {
+  if (!confirm('Nonaktifkan paslon ini? Data suara yang sudah masuk tetap tersimpan.')) return;
+  const r = await apiDelete('/api/admin/candidates/' + id);
+  if (r.ok) { showAlert('Paslon dinonaktifkan.', 'success'); loadCandidates(); }
+  else showAlert(r.message);
+}
+
+document.getElementById('btnNew').addEventListener('click', () => openForm());
+document.getElementById('btnCancel').addEventListener('click', () => document.getElementById('formModal').classList.add('hidden'));
+
+document.getElementById('candidateForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const id = document.getElementById('candidateId').value;
+  const fd = new FormData();
+  fd.append('nomor_urut', document.getElementById('nomor_urut').value);
+  fd.append('nama_ketua', document.getElementById('nama_ketua').value);
+  fd.append('nama_wakil', document.getElementById('nama_wakil').value);
+  fd.append('visi', document.getElementById('visi').value);
+  fd.append('misi', document.getElementById('misi').value);
+  fd.append('status', document.getElementById('status').value);
+  const fotoFile = document.getElementById('foto').files[0];
+  if (fotoFile) fd.append('foto', fotoFile);
+
+  const r = id ? await apiPut('/api/admin/candidates/' + id, fd, true) : await apiPost('/api/admin/candidates', fd, true);
+  if (r.ok) {
+    document.getElementById('formModal').classList.add('hidden');
+    showAlert('Data paslon tersimpan.', 'success');
+    loadCandidates();
+  } else {
+    showAlert(r.message || 'Gagal menyimpan.');
+  }
+});
+
+async function init() {
+  const me = await guardAdmin();
+  if (!me) return;
+  loadCandidates();
+}
+init();
+</script>
+</body>
+</html>

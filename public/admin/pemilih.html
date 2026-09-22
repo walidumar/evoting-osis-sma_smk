@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Data Pemilih - E-Voting OSIS</title>
+<script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="min-h-screen bg-slate-950 text-white">
+  <div id="adminNav"></div>
+  <div class="max-w-6xl mx-auto p-4 md:p-8">
+    <h1 class="text-2xl font-bold mb-6">Data Pemilih</h1>
+
+    <div class="flex gap-2 mb-4">
+      <button data-tab="siswa" class="tabBtn bg-blue-600 rounded-lg px-4 py-2 text-sm font-semibold">Siswa</button>
+      <button data-tab="guru" class="tabBtn bg-slate-700 rounded-lg px-4 py-2 text-sm font-semibold">Guru</button>
+    </div>
+
+    <input id="searchInput" placeholder="Cari nama atau NISN/NIK..." class="w-full mb-4 rounded-lg bg-slate-800 border border-white/10 px-4 py-2.5">
+
+    <div class="bg-white/5 border border-white/10 rounded-xl overflow-hidden">
+      <table class="w-full text-sm">
+        <thead id="tableHead" class="bg-slate-800 text-left"></thead>
+        <tbody id="tableBody"></tbody>
+      </table>
+    </div>
+    <p id="emptyState" class="hidden text-slate-500 text-center py-8">Tidak ada data.</p>
+  </div>
+
+<script src="/js/api.js"></script>
+<script src="/js/admin-nav.js"></script>
+<script>
+let currentTab = 'siswa';
+
+document.querySelectorAll('.tabBtn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    currentTab = btn.dataset.tab;
+    document.querySelectorAll('.tabBtn').forEach(b => b.className = 'tabBtn bg-slate-700 rounded-lg px-4 py-2 text-sm font-semibold');
+    btn.className = 'tabBtn bg-blue-600 rounded-lg px-4 py-2 text-sm font-semibold';
+    loadData();
+  });
+});
+
+document.getElementById('searchInput').addEventListener('input', debounce(loadData, 300));
+
+function debounce(fn, ms) {
+  let t;
+  return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), ms); };
+}
+
+async function loadData() {
+  const q = document.getElementById('searchInput').value.trim();
+  const url = currentTab === 'siswa' ? '/api/admin/students?q=' + encodeURIComponent(q) : '/api/admin/teachers?q=' + encodeURIComponent(q);
+  const r = await apiGet(url);
+  if (!r.ok) return;
+
+  const head = document.getElementById('tableHead');
+  const body = document.getElementById('tableBody');
+
+  if (currentTab === 'siswa') {
+    head.innerHTML = '<tr><th class="p-3">NISN</th><th class="p-3">Nama</th><th class="p-3">Kelas</th><th class="p-3">Jurusan</th><th class="p-3">Status</th><th class="p-3">Memilih?</th><th class="p-3">Aksi</th></tr>';
+    body.innerHTML = r.data.map(s => `
+      <tr class="border-t border-white/5">
+        <td class="p-3 font-mono">${s.nisn}</td>
+        <td class="p-3">${s.nama}</td>
+        <td class="p-3">${s.kelas || '-'}</td>
+        <td class="p-3">${s.jurusan || '-'}</td>
+        <td class="p-3">${statusBadge(s.status)}</td>
+        <td class="p-3">${votedBadge(s.has_voted)}</td>
+        <td class="p-3"><button onclick="toggleStatus('students', ${s.id}, '${s.status}')" class="text-blue-400 hover:underline text-xs">${s.status === 'active' ? 'Nonaktifkan' : 'Aktifkan'}</button></td>
+      </tr>
+    `).join('');
+  } else {
+    head.innerHTML = '<tr><th class="p-3">NIK</th><th class="p-3">Nama</th><th class="p-3">Jabatan</th><th class="p-3">Status</th><th class="p-3">Memilih?</th><th class="p-3">Aksi</th></tr>';
+    body.innerHTML = r.data.map(t => `
+      <tr class="border-t border-white/5">
+        <td class="p-3 font-mono">${t.nik}</td>
+        <td class="p-3">${t.nama}</td>
+        <td class="p-3">${t.jabatan || '-'}</td>
+        <td class="p-3">${statusBadge(t.status)}</td>
+        <td class="p-3">${votedBadge(t.has_voted)}</td>
+        <td class="p-3"><button onclick="toggleStatus('teachers', ${t.id}, '${t.status}')" class="text-blue-400 hover:underline text-xs">${t.status === 'active' ? 'Nonaktifkan' : 'Aktifkan'}</button></td>
+      </tr>
+    `).join('');
+  }
+  document.getElementById('emptyState').classList.toggle('hidden', r.data.length > 0);
+}
+
+function statusBadge(s) {
+  return s === 'active' ? '<span class="text-xs px-2 py-0.5 rounded-full bg-green-500/20 text-green-300">Aktif</span>' : '<span class="text-xs px-2 py-0.5 rounded-full bg-slate-700 text-slate-400">Nonaktif</span>';
+}
+function votedBadge(v) {
+  return v ? '<span class="text-xs px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300">Sudah</span>' : '<span class="text-xs px-2 py-0.5 rounded-full bg-yellow-500/20 text-yellow-300">Belum</span>';
+}
+
+async function toggleStatus(table, id, currentStatus) {
+  const newStatus = currentStatus === 'active' ? 'inactive' : 'active';
+  const r = await apiPatch('/api/admin/' + table + '/' + id + '/status', { status: newStatus });
+  if (r.ok) loadData();
+}
+
+async function init() {
+  const me = await guardAdmin();
+  if (!me) return;
+  loadData();
+}
+init();
+</script>
+</body>
+</html>

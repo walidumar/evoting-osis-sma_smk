@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Audit Log - E-Voting OSIS</title>
+<script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="min-h-screen bg-slate-950 text-white">
+  <div id="adminNav"></div>
+  <div class="max-w-5xl mx-auto p-4 md:p-8">
+    <h1 class="text-2xl font-bold mb-6">Audit Log</h1>
+    <p class="text-slate-400 text-sm mb-4">Mencatat aktivitas penting sistem. Untuk menjaga privasi pemilih, log ini <strong>tidak</strong> mencatat paslon yang dipilih seseorang.</p>
+    <div class="bg-white/5 border border-white/10 rounded-xl overflow-hidden">
+      <table class="w-full text-sm">
+        <thead class="bg-slate-800 text-left"><tr><th class="p-3">Waktu</th><th class="p-3">Aksi</th><th class="p-3">Deskripsi</th><th class="p-3">Admin</th><th class="p-3">IP</th></tr></thead>
+        <tbody id="tableBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+<script src="/js/api.js"></script>
+<script src="/js/admin-nav.js"></script>
+<script>
+async function load() {
+  const r = await apiGet('/api/admin/audit-logs?limit=300');
+  if (!r.ok) return;
+  document.getElementById('tableBody').innerHTML = r.data.map(a => `
+    <tr class="border-t border-white/5">
+      <td class="p-3 whitespace-nowrap">${a.created_at}</td>
+      <td class="p-3"><span class="text-xs px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300">${a.action}</span></td>
+      <td class="p-3 text-slate-300">${a.description || '-'}</td>
+      <td class="p-3">${a.username || '-'}</td>
+      <td class="p-3 text-slate-500 font-mono text-xs">${a.ip_address || '-'}</td>
+    </tr>
+  `).join('');
+}
+async function init() {
+  const me = await guardAdmin();
+  if (!me) return;
+  load();
+}
+init();
+</script>
+</body>
+</html>

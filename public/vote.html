@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pilih Ketua OSIS</title>
+<script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="min-h-screen bg-slate-950 text-white p-4 md:p-8">
+  <div class="max-w-5xl mx-auto">
+    <div class="text-center mb-8">
+      <p id="halo" class="text-blue-300 text-sm mb-1"></p>
+      <h1 class="text-2xl md:text-3xl font-extrabold">PILIH PASANGAN CALON KETUA OSIS</h1>
+      <p class="text-slate-400 text-sm mt-2">Pilih salah satu paslon di bawah ini, lalu konfirmasi pilihan Anda.</p>
+    </div>
+
+    <div id="alertBox" class="hidden max-w-xl mx-auto mb-6 p-3 rounded-lg text-sm text-center"></div>
+
+    <div id="candidateGrid" class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3"></div>
+  </div>
+
+  <!-- Modal konfirmasi -->
+  <div id="confirmModal" class="hidden fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50">
+    <div class="bg-slate-900 border border-white/10 rounded-2xl p-6 max-w-sm w-full text-center">
+      <h2 class="text-xl font-bold mb-1">Konfirmasi Pilihan</h2>
+      <p class="text-slate-400 text-sm mb-4">Anda memilih:</p>
+      <div id="modalCandidateInfo" class="bg-white/5 rounded-xl p-4 mb-4 text-left"></div>
+      <p class="mb-5 font-medium">Apakah Anda yakin dengan pilihan ini?</p>
+      <div class="flex gap-3">
+        <button id="btnBatal" class="flex-1 bg-slate-700 hover:bg-slate-600 rounded-lg py-3 font-semibold">BATAL</button>
+        <button id="btnYakin" class="flex-1 bg-blue-600 hover:bg-blue-500 rounded-lg py-3 font-semibold">YA, SAYA YAKIN</button>
+      </div>
+    </div>
+  </div>
+
+<script src="/js/api.js"></script>
+<script>
+let selectedCandidate = null;
+let candidates = [];
+
+function showAlert(msg, type='error') {
+  const box = document.getElementById('alertBox');
+  box.textContent = msg;
+  box.className = 'max-w-xl mx-auto mb-6 p-3 rounded-lg text-sm text-center ' + (type==='error' ? 'bg-red-500/20 text-red-200 border border-red-500/30' : 'bg-green-500/20 text-green-200 border border-green-500/30');
+  box.classList.remove('hidden');
+}
+
+function renderCandidates() {
+  const grid = document.getElementById('candidateGrid');
+  grid.innerHTML = candidates.map(c => `
+    <div class="bg-white/5 border border-white/10 rounded-2xl overflow-hidden flex flex-col">
+      <div class="aspect-square bg-slate-800 flex items-center justify-center">
+        ${c.foto ? `<img src="${c.foto}" class="w-full h-full object-cover" alt="Foto Paslon ${c.nomor_urut}">` : `<span class="text-slate-500 text-sm">Tidak ada foto</span>`}
+      </div>
+      <div class="p-5 flex-1 flex flex-col">
+        <p class="text-blue-300 font-bold text-sm mb-1">PASLON ${c.nomor_urut}</p>
+        <p class="text-xs text-slate-400">NAMA KETUA</p>
+        <p class="font-semibold mb-2">${escapeHtml(c.nama_ketua)}</p>
+        <p class="text-xs text-slate-400">NAMA WAKIL</p>
+        <p class="font-semibold mb-2">${escapeHtml(c.nama_wakil || '-')}</p>
+        <p class="text-xs text-slate-400">VISI SINGKAT</p>
+        <p class="text-sm text-slate-300 mb-4 line-clamp-3">${escapeHtml(c.visi || '-')}</p>
+        <button onclick="openConfirm(${c.id})" class="mt-auto w-full bg-blue-600 hover:bg-blue-500 rounded-lg py-3 font-semibold">MILIH PASLON INI</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str || '';
+  return div.innerHTML;
+}
+
+function openConfirm(id) {
+  selectedCandidate = candidates.find(c => c.id === id);
+  document.getElementById('modalCandidateInfo').innerHTML = `
+    <p class="text-blue-300 font-bold text-sm mb-1">PASLON ${selectedCandidate.nomor_urut}</p>
+    <p class="text-xs text-slate-400">Ketua</p><p class="font-semibold mb-2">${escapeHtml(selectedCandidate.nama_ketua)}</p>
+    <p class="text-xs text-slate-400">Wakil</p><p class="font-semibold">${escapeHtml(selectedCandidate.nama_wakil || '-')}</p>
+  `;
+  document.getElementById('confirmModal').classList.remove('hidden');
+}
+
+document.getElementById('btnBatal').addEventListener('click', () => {
+  document.getElementById('confirmModal').classList.add('hidden');
+  selectedCandidate = null;
+});
+
+document.getElementById('btnYakin').addEventListener('click', async () => {
+  const btn = document.getElementById('btnYakin');
+  btn.disabled = true; btn.textContent = 'Menyimpan...';
+  const r = await apiPost('/api/voter/vote', { candidate_id: selectedCandidate.id });
+  if (r.ok) {
+    window.location.href = '/sukses.html';
+  } else {
+    document.getElementById('confirmModal').classList.add('hidden');
+    showAlert(r.message || 'Gagal menyimpan suara.');
+    btn.disabled = false; btn.textContent = 'YA, SAYA YAKIN';
+    if (r.error === 'ALREADY_VOTED') {
+      setTimeout(() => window.location.href = '/index.html', 2500);
+    }
+  }
+});
+
+async function init() {
+  const me = await apiGet('/api/voter/me');
+  if (!me.ok) { window.location.href = '/index.html'; return; }
+  if (me.data.has_voted) { window.location.href = '/sukses.html'; return; }
+  document.getElementById('halo').textContent = 'Halo, ' + me.data.nama;
+
+  const r = await apiGet('/api/voter/candidates');
+  if (!r.ok || !r.data || r.data.length === 0) {
+    showAlert('Belum ada paslon aktif. Silakan hubungi panitia.');
+    return;
+  }
+  candidates = r.data;
+  renderCandidates();
+}
+init();
+</script>
+</body>
+</html>

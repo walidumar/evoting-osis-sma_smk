@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pemilihan Ketua OSIS</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="icon" href="data:,">
+</head>
+<body class="min-h-screen bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900 text-white flex items-center justify-center p-4">
+  <div class="w-full max-w-2xl">
+    <div class="bg-white/5 backdrop-blur border border-white/10 rounded-2xl shadow-2xl p-8 md:p-12 text-center">
+      <p id="namaSekolah" class="text-blue-300 font-medium tracking-wide uppercase text-sm mb-2">Memuat...</p>
+      <h1 class="text-3xl md:text-4xl font-extrabold mb-1">PEMILIHAN KETUA OSIS</h1>
+      <p id="tahunPelajaran" class="text-slate-300 mb-6">Tahun Pelajaran -</p>
+
+      <div id="statusBox" class="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-slate-800 border border-white/10 mb-8">
+        <span id="statusDot" class="w-2.5 h-2.5 rounded-full bg-gray-400"></span>
+        <span id="statusText" class="text-sm font-semibold">Memuat status...</span>
+      </div>
+
+      <p class="text-slate-300 mb-8">Gunakan <span class="font-semibold text-white">NISN</span> untuk siswa dan <span class="font-semibold text-white">NIK</span> untuk guru.</p>
+
+      <div class="grid sm:grid-cols-2 gap-4 mb-4">
+        <a href="/login-siswa.html" class="block bg-blue-600 hover:bg-blue-500 transition rounded-xl py-4 font-semibold text-lg">LOGIN SISWA</a>
+        <a href="/login-guru.html" class="block bg-emerald-600 hover:bg-emerald-500 transition rounded-xl py-4 font-semibold text-lg">LOGIN GURU</a>
+      </div>
+      <a href="/realcount.html" class="block bg-white/10 hover:bg-white/20 transition rounded-xl py-3 font-medium border border-white/10">LIHAT REALCOUNT</a>
+
+      <p class="mt-10 text-xs text-slate-500">
+        <a href="/admin/login.html" class="hover:text-slate-300 underline underline-offset-2">Panel Admin</a>
+      </p>
+    </div>
+  </div>
+
+<script src="/js/api.js"></script>
+<script>
+async function load() {
+  const r = await apiGet('/api/public/settings');
+  if (!r.ok) return;
+  const s = r.data;
+  document.getElementById('namaSekolah').textContent = s.nama_sekolah;
+  document.getElementById('tahunPelajaran').textContent = 'Tahun Pelajaran ' + s.tahun_pelajaran;
+
+  const map = {
+    belum_dimulai: { text: 'BELUM DIMULAI', color: 'bg-yellow-400' },
+    berlangsung: { text: 'SEDANG BERLANGSUNG', color: 'bg-green-400' },
+    selesai: { text: 'SELESAI', color: 'bg-red-400' },
+  };
+  const m = map[s.status] || map.belum_dimulai;
+  document.getElementById('statusText').textContent = 'STATUS PEMILIHAN: ' + m.text;
+  document.getElementById('statusDot').className = 'w-2.5 h-2.5 rounded-full ' + m.color;
+}
+load();
+</script>
+</body>
+</html>
